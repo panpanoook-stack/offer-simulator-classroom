@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="大厂 Offer 模拟器：一个关于求职、选择与职场规则的互动叙事游戏。">
+<meta name="theme-color" content="#E8EDF5">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<title>大厂Offer模拟器</title>
+<style>
+/* Layout: one game column — sticky stat HUD on top, a "scene card" below with a location strip, story, and chunky choice buttons. */
+:root{
+  --bg:#E8EDF5; --panel:#FAFBFE; --ink:#141B2B; --muted:#586379; --line:#C7D0DF;
+  --accent:#2B4CF0; --accent-ink:#FFFFFF; --hard:#141B2B; --dot:rgba(43,76,240,.11);
+  --energy:#1C9A69; --study:#7449D3; --anx:#E0442B; --money:#A86E06; --soft:#EEF2FB;
+  --f-display:"ZCOOL QingKe HuangYou","PingFang SC","Microsoft YaHei",sans-serif;
+  --f-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D1220; --panel:#151C2D; --ink:#E7ECF6; --muted:#98A2B7; --line:#2A3449;
+  --accent:#7590FF; --accent-ink:#0D1220; --hard:#000000; --dot:rgba(117,144,255,.10);
+  --energy:#3CCB8F; --study:#A98AF2; --anx:#FF6A50; --money:#E6AC3E; --soft:#1B2338; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D1220; --panel:#151C2D; --ink:#E7ECF6; --muted:#98A2B7; --line:#2A3449;
+  --accent:#7590FF; --accent-ink:#0D1220; --hard:#000000; --dot:rgba(117,144,255,.10);
+  --energy:#3CCB8F; --study:#A98AF2; --anx:#FF6A50; --money:#E6AC3E; --soft:#1B2338; color-scheme:dark}
+
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:17px;line-height:1.75;
+  background-image:radial-gradient(var(--dot) 1.2px,transparent 1.2px);background-size:22px 22px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:780px;margin:0 auto;padding-block:16px 48px;display:flex;flex-direction:column;gap:18px}
+
+/* HUD */
+.hud{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border:2px solid var(--ink);
+  box-shadow:4px 4px 0 var(--hard);border-radius:4px;padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px}
+.hud-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.brand{font-family:var(--f-display);font-size:20px;letter-spacing:.04em;line-height:1}
+.restart{font:500 13px var(--f-body);background:none;border:1.5px solid var(--line);color:var(--muted);border-radius:3px;padding:3px 10px;cursor:pointer}
+.restart:hover{color:var(--ink);border-color:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.stat{position:relative;min-width:0}
+.stat .lab{display:flex;justify-content:space-between;font-size:12px;letter-spacing:.08em;color:var(--muted);line-height:1.4}
+.stat .lab b{font-family:var(--f-mono);font-weight:700;color:var(--ink);letter-spacing:0;font-variant-numeric:tabular-nums}
+.bar{height:9px;border:1.5px solid var(--ink);border-radius:2px;background:var(--soft);overflow:hidden;margin-top:3px}
+.bar i{display:block;height:100%;transition:width .5s ease}
+.stat.e .bar i{background:var(--energy)} .stat.s .bar i{background:var(--study)} .stat.a .bar i{background:var(--anx)}
+.money{font-family:var(--f-mono);font-weight:700;font-size:18px;color:var(--money);line-height:1.35;font-variant-numeric:tabular-nums;white-space:nowrap}
+.money.neg{color:var(--anx)}
+.stat.low .bar{animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{border-color:var(--anx)}}
+.delta{position:absolute;right:0;top:-20px;font:700 13px var(--f-mono);padding:0 5px;border-radius:2px;background:var(--ink);color:var(--panel);animation:pop 1.8s ease forwards;pointer-events:none;white-space:nowrap}
+@keyframes pop{0%{opacity:0;transform:translateY(6px)}15%{opacity:1;transform:none}75%{opacity:1}100%{opacity:0;transform:translateY(-6px)}}
+.prog{height:4px;background:var(--soft);border-radius:2px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--accent);transition:width .6s ease}
+
+/* Scene card */
+.card{background:var(--panel);border:2px solid var(--ink);box-shadow:6px 6px 0 var(--hard);border-radius:4px;overflow:hidden}
+.loc{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 16px;background:var(--ink);color:var(--panel);
+  font:500 13px var(--f-mono);letter-spacing:.06em;padding:8px 18px}
+.loc span:first-child::before{content:"● ";color:var(--anx)}
+.body{padding:22px 24px 26px;display:flex;flex-direction:column;gap:18px}
+.chapter{font-family:var(--f-display);font-size:clamp(26px,5vw,36px);line-height:1.15;letter-spacing:.03em;text-wrap:balance;margin:0}
+.story{display:flex;flex-direction:column;gap:10px;max-width:40em}
+.story p{margin:0}
+.story p.inner{color:var(--muted);border-left:3px solid var(--study);padding-left:12px;font-size:.95em}
+.story p.inner::before{content:"心里";font:700 11px var(--f-mono);letter-spacing:.1em;color:var(--study);border:1.5px solid var(--study);border-radius:2px;padding:0 4px;margin-right:8px;vertical-align:2px}
+.choice.exit{border-style:dashed;box-shadow:none;background:transparent}
+.choice.exit kbd{border-style:dashed}
+.story p strong{color:var(--accent);font-weight:700}
+.story.fx p{animation:rise .5s ease both}
+@keyframes rise{from{opacity:.0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:700 13px var(--f-mono);border:1.5px solid currentColor;border-radius:3px;padding:1px 8px;font-variant-numeric:tabular-nums}
+.chip.e{color:var(--energy)} .chip.s{color:var(--study)} .chip.a{color:var(--anx)} .chip.m{color:var(--money)}
+
+.choices{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+.choice{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;align-items:start;text-align:left;width:100%;
+  font:500 17px/1.55 var(--f-body);color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:4px;
+  box-shadow:4px 4px 0 var(--hard);padding:12px 16px;cursor:pointer;transition:transform .08s,box-shadow .08s,background .15s}
+.choice:hover:not(:disabled){background:var(--soft);transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--hard)}
+.choice:active:not(:disabled){transform:translate(3px,3px);box-shadow:1px 1px 0 var(--hard)}
+.choice:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.choice kbd{grid-row:span 2;font:700 14px var(--f-mono);border:1.5px solid var(--ink);border-radius:3px;padding:0 7px;line-height:24px;margin-top:2px}
+.choice .cs{grid-column:2;font-size:14px;color:var(--muted);font-weight:400}
+.choice.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--ink)}
+.choice.primary kbd{border-color:currentColor}
+.choice.primary:hover:not(:disabled){background:var(--accent);filter:brightness(1.08)}
+.choice.rewind{border-style:dashed}
+.choice:disabled{opacity:.45;cursor:not-allowed;box-shadow:none;text-decoration:line-through}
+.choice:disabled .cs{text-decoration:none}
+.choice.quiet{box-shadow:none;border-width:1.5px;border-color:var(--line);color:var(--muted);font-size:15px}
+.choice.quiet kbd{border-color:var(--line)}
+
+/* Title */
+.title-hero{padding:30px 24px 26px;display:flex;flex-direction:column;gap:18px}
+.title-hero h1{font-family:var(--f-display);font-size:clamp(44px,11vw,84px);line-height:1;margin:0;letter-spacing:.02em}
+.title-hero h1 em{font-style:normal;color:var(--accent)}
+.sub{color:var(--muted);margin:0;max-width:34em}
+.rolecard{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 18px;border:1.5px dashed var(--line);border-radius:4px;padding:14px 16px;font-size:15px}
+.rolecard dt{color:var(--muted);letter-spacing:.08em;font-size:13px;line-height:1.9}
+.rolecard dd{margin:0;font-weight:500}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.hint kbd{font:600 12px var(--f-mono);border:1px solid var(--line);border-radius:3px;padding:0 5px}
+
+/* Handover */
+.handlist{display:flex;flex-direction:column;gap:10px}
+.hitem{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;width:100%;font:500 16px/1.5 var(--f-body);
+  color:var(--ink);background:var(--panel);border:2px solid var(--ink);border-radius:4px;padding:10px 14px;cursor:pointer;box-shadow:3px 3px 0 var(--hard)}
+.hitem:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.hitem .tag{flex:none;font:700 12px var(--f-mono);border:1.5px solid var(--ink);border-radius:3px;padding:0 6px}
+.hitem.done{cursor:default;box-shadow:none;border-color:var(--line);color:var(--muted)}
+.hitem.done .txt{text-decoration:line-through}
+.hitem.done .tag{border-color:var(--anx);color:var(--anx)}
+.hitem .txt small{display:block;font-size:13px;color:var(--muted);font-weight:400}
+
+/* Loop */
+.learned{display:flex;flex-wrap:wrap;gap:6px}
+.learned span{font-size:13px;border:1.5px solid var(--study);color:var(--study);border-radius:3px;padding:0 7px}
+.counter{font:700 13px var(--f-mono);color:var(--muted);letter-spacing:.06em}
+
+/* Ending */
+.endgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.endgrid div{border:2px solid var(--ink);border-radius:4px;padding:10px 12px;min-width:0}
+.endgrid b{display:block;font:700 24px var(--f-mono);line-height:1.3;font-variant-numeric:tabular-nums}
+.endgrid span{font-size:13px;color:var(--muted)}
+.endgrid .zero b{color:var(--anx)}
+.timeline{list-style:none;margin:0;padding:0 0 0 16px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:8px;font-size:15px}
+.timeline li{position:relative}
+.timeline li::before{content:"";position:absolute;left:-22px;top:9px;width:10px;height:10px;background:var(--accent);border:2px solid var(--panel);border-radius:50%}
+.timeline small{color:var(--muted);margin-right:6px}
+.discuss{background:var(--soft);border-radius:4px;padding:14px 18px}
+.discuss h3{font-family:var(--f-display);font-size:22px;margin:0 0 6px;font-weight:400}
+.discuss ol{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:4px}
+h2.sec{font-size:13px;letter-spacing:.12em;color:var(--muted);margin:6px 0 -6px;font-weight:500}
+
+@media (max-width:560px){
+  body{font-size:16px}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}
+  .body{padding:18px 16px 22px}
+  .endgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="hud" id="hud" hidden></header>
+  <section class="card" id="scene" aria-live="polite"></section>
+</div>
+
+<script>
+const START = {e:85, s:70, a:25, m:30000};
+const TOTAL = 11;
+
+const N = {
+  n1:{prog:0, chapter:"序章 · 开学", place:"上海 · 研究生宿舍", time:"研一 · 9月 · 23:40",
+    text:["开学第一周，你的朋友圈已经被「实习 offer」刷屏。",
+      "室友在改第三版简历，隔壁寝室在争论字节和鹅厂哪家转正率高。你打开招聘软件，在搜索框里打下：<strong>文科 实习</strong>。",
+      "跳出来的岗位五花八门：新媒体运营、社群运营、内容审核、用户研究……你没有任何互联网经验，也不知道它们有什么区别。"],
+    choices:[
+      {label:"先随便投几个，有实习总比没有强", fx:{a:5}, next:"n61"},
+      {label:"先打听清楚，再决定方向", fx:{e:-5,a:10}, next:"n62"}]},
+
+  n61:{prog:1, chapter:"第一章 · 第一份实习", place:"上海 · 某公司工位", time:"研一 · 11月",
+    text:["你在信息不足的情况下，接下了 xx 公司的「社群运营实习生」offer。JD 上写着：<strong>负责用户增长与社群生态建设</strong>。",
+      "入职第三天你搞明白了：所谓社群生态，就是每天拉 20 个微信群，然后在群里一遍遍给大家发骚扰短信。",
+      "你的微信因为加人太频繁被限制了两次。有用户私聊骂你是骗子。",
+      "你有些惊讶，也有些无措。现在离职，会留下不好的记录；不离职，宝贵的实习机会就这样被浪费。",
+      "〔心〕你很清楚这份工作没什么意义。你也很清楚，简历上需要一段实习。"],
+    choices:[
+      {label:"离职，及时止损", sub:"简历上会多一段「不到三个月」", fx:{e:-5,a:10},
+        result:["你交了离职申请。HR 在系统里写下：<strong>试用期主动离职</strong>。","简历上的那一行，你后来在每次面试前都要想好怎么解释。","你决定换个方向，这一次，先把信息搞清楚。"], next:"n62"},
+      {label:"忍着，至少简历上有一段实习", sub:"再熬两个月", fx:{e:-20,a:10},
+        result:["你又做了两个月，一共拉了 1,200 个群。","实习证明到手了。可你自己知道，这段经历在面试官眼里没什么可讲的。","你决定换个方向，这一次，先把信息搞清楚。"], next:"n62"}]},
+
+  n62:{prog:2, chapter:"第二章 · 转行产品", place:"上海 · 图书馆", time:"研一 · 1月 · 01:12",
+    text:["你开始费劲心机打探消息：加了 6 个求职群，私信了 11 位学长学姐，把「文科生 互联网」的帖子翻到了底。",
+      "结论几乎一致：<strong>产品经理是文科生最好的选择</strong>。不考代码，薪资却能和技术岗看齐。",
+      "可想当产品经理，简历上得先有产品项目。你不知道项目从哪来，开始焦虑不安。",
+      "凌晨一点，你在小红书上疯狂刷帖，突然跳出来一条：「大厂 PM 一对一求职陪跑，带你做完整产品项目，面试邀约率翻倍」。",
+      "价格：<strong>¥12,800</strong>。",
+      "〔心〕你知道这种帖子多半是在贩卖焦虑。你也知道，自己就是那个被卖的人。"],
+    choices:[
+      {label:"不买。太贵了，我自己摸索", disabledIf:"seen71", disabledNote:"你已经看过这条路的尽头", next:"n71"},
+      {label:"买。省吃俭用也要买", fx:{m:-12800,e:-5,a:-5},
+        result:["你把下学期的生活费挪了出来，跟家里说要买学习资料。","接下来两个月，陪跑老师带你做了一个「AI 读书笔记」App 的完整方案：用户调研、竞品分析、PRD、原型图。","你把它写进了简历第一行。"], next:"n72"},
+      {label:"算了，不进互联网了，回老家考编", cls:"exit", exit:true, disabledIf:"exit1", disabledNote:"另一条路，也在卷", next:"exit1"}]},
+
+  exit1:{prog:2, chapter:"退出尝试 · 考编", place:"上海 · 图书馆", time:"研一 · 1月 · 02:30",
+    text:["你关掉小红书，打开了考编论坛。",
+      "你想报的那个岗位，去年<strong>报录比 312 : 1</strong>。置顶帖是一份「上岸时间表」：每天 6 点起，刷题 10 小时，坚持 8 个月。",
+      "评论区里，有人已经考了第三年。",
+      "过年回家，亲戚问你：「读了研究生，怎么还回来考编？那本科不就够了？」",
+      "〔心〕原来你想逃去的地方，也在卷，只是换了一套题。"],
+    choices:[{label:"回到那条帖子前", cls:"rewind", flag:"exit1", fx:{a:10}, next:"n62"}]},
+
+  n71:{prog:2, chapter:"平行时空 · 一年以后", place:"上海 · 秋招季", time:"研二 · 10月",
+    text:["你觉得家里并不富裕，没有买陪跑，转而做起了其他岗位。",
+      "一年后正式就业时，你发现：那些和你付出同等努力、但有钱去做项目的同学，成功当上了产品经理。",
+      "他们的薪资，<strong>比你高 40%</strong>。",
+      "你翻出那条帖子，评论区里的「已上岸」一条接着一条。"],
+    choices:[
+      {label:"倒回那个凌晨，重新选择", sub:"有些选择，看过结局之后就很难再做一次", cls:"rewind", flag:"seen71", fx:{a:15}, next:"n62"}]},
+
+  n72:{prog:3, chapter:"第三章 · 北上", place:"上海 · 宿舍", time:"研一 · 3月",
+    text:["简历改到第 9 版的时候，你终于收到了一家大厂的产品经理实习 offer。",
+      "你盯着屏幕看了很久，然后注意到地址那一栏：<strong>北京市海淀区</strong>。",
+      "你在上海上学。去北京，意味着课程要请假、组会要远程、学业要搁置，还有一大笔租房和生活费用：海淀的单间，月租 ¥4,500 起。",
+      "实习工资 ¥200 一天，扣掉房租，所剩无几。你选择？"],
+    choices:[
+      {label:"去北京，机会不等人", fx:{m:-9000,s:-20,e:-10,a:5},
+        result:["你在海淀租了一个 8 平米的次卧，押一付三。","出发前，你给导师发了一条很长的微信，解释为什么这学期组会只能线上参加。","导师回了一个字：<strong>嗯</strong>。"], next:"n8"},
+      {label:"不去，学业更重要", fx:{a:25,s:-10,m:-9000,e:-10},
+        result:["你婉拒了 offer，留在上海上课。","三个月后，同届同学陆续晒出大厂工牌。你的简历上，依然只有那个陪跑项目。","你意识到，在这条赛道上，停下来本身就是一种选择。你重新开始投递，又拿到一家北京公司的 offer。","这一次，你没有再犹豫，还是去了北京。"], next:"n8"}]},
+
+  n8:{prog:4, chapter:"第四章 · 暑期实习", place:"北京 · 工位", time:"研一 · 4月–6月",
+    text:["你还是决定持续投入。入职后，你每天 10 点到、11 点走，周末把需求文档带回出租屋。",
+      "很快到了找暑期实习的时候。<strong>暑期实习表现优秀者，可以转正</strong>，这是通往正式 offer 最近的一条路。",
+      "你一边实习，一边应付学校的事，一边投递面试。午休在楼梯间接电话面试，晚上 11 点回家刷题、赶课程作业。",
+      "投出第 87 份简历之后，鹅厂约你面试了。"],
+    choices:[{label:"开始面试", cls:"primary", fx:{e:-10,a:5}, next:"int1"}]},
+
+  int1:{prog:4, chapter:"鹅厂面试 · 群面", place:"深圳 · 鹅厂会议室", time:"第 1 轮 / 共 5 轮",
+    text:["8 个人，一张会议桌，40 分钟。题目是：<strong>为一款老年人社交 App 设计增长方案</strong>。",
+      "计时一开始，左边的同学抢先说：「我来计时。」右边的同学说：「我来总结。」所有人都看向你。"],
+    choices:[
+      {label:"主动担任 Leader，推动讨论", fx:{e:-10,a:5},
+        result:["你控住了节奏，但也打断了两个人。走出会议室时，你不确定这算加分还是减分。","两天后，通知来了：进入下一轮。"], next:"int2"},
+      {label:"安静听，关键时刻补一个洞察", fx:{e:-10,a:10},
+        result:["你只说了三句话，其中一句被最后的总结引用了。","两天后，通知来了：进入下一轮。"], next:"int2"}]},
+
+  int2:{prog:4, chapter:"鹅厂面试 · 单面 ×3", place:"线上 · 腾讯会议", time:"第 2–4 轮 / 共 5 轮",
+    text:["一面问项目：「你这个陪跑项目，数据是真实的吗？」",
+      "二面问业务：「如果让你负责一款阅读产品的拉新，你怎么做？」",
+      "三面问动机：「你一个文科生，为什么要做产品？」",
+      "三场面试分布在两周里。每一场之前，你都要跟 mentor 请假、找空会议室、对着手机镜头练一遍。"],
+    choices:[
+      {label:"全部真诚作答", fx:{e:-15,a:10}, result:["三场全过。你开始在梦里回答面试官的问题。"], next:"int3"},
+      {label:"按网上的面经背标准答案", fx:{e:-15,a:15}, result:["〔心〕面试官知道你在背，你也知道他知道。大家配合得很好。","三场全过。你开始在梦里回答面试官的问题。"], next:"int3"}]},
+
+  int3:{prog:4, chapter:"鹅厂面试 · 交叉面", place:"线上 · 腾讯会议", time:"第 5 轮 / 共 5 轮",
+    text:["交叉面的面试官来自另一个部门，只问了一个问题：",
+      "<strong>「你觉得自己最大的缺点是什么？」</strong>",
+      "你张了张嘴。这一路上，你几乎没有时间停下来想这个问题。"],
+    choices:[
+      {label:"「我太追求完美了。」", fx:{e:-10,a:10},
+        result:["面试官点点头，在本子上写了几个字。","一周后，邮件来了：<strong>恭喜你获得鹅厂暑期实习意向 offer</strong>。"], next:"n8end"},
+      {label:"「我好像一直在跑，却没想过要去哪。」", fx:{e:-10,a:10},
+        result:["面试官愣了一下，然后笑了：「挺诚实的。」","一周后，邮件来了：<strong>恭喜你获得鹅厂暑期实习意向 offer</strong>。"], next:"n8end"}]},
+
+  n8end:{prog:4, chapter:"一场群面，三场单面，一场交叉面", place:"北京 · 出租屋", time:"研一 · 6月",
+    text:["你摸了摸自己的心脏，跳得很快，又好像很累。",
+      "你算了一下，这两个月平均每天只睡了 5 个小时。你感叹自己竟然<strong>进化掉了睡眠</strong>。",
+      "你在朋友圈发了这句话，配了一个笑哭的表情。三十多个人点赞，评论区全是「哈哈哈哈太真实了」。",
+      "〔心〕笑完，你定好了第二天早上八点的闹钟。",
+      "回到家，你躺了整整一周才恢复过来。"],
+    choices:[{label:"躺一周", fx:{e:35}, next:"n9"}]},
+
+  n9:{prog:5, chapter:"第五章 · 赛马", place:"深圳 · 南山", time:"研二 · 7月",
+    enter:{m:-10400},
+    text:["才休息了一周，你就赶往深圳实习。这时候你已经不在乎租房成本的投入：南山的单间，押一付一，¥10,400。",
+      "入职第一天你才知道，这个岗位一共招了 23 个实习生进来<strong>赛马</strong>，最后的转正比例是 <strong>30%</strong>。",
+      "此时你只想尽早入职，尽早积累项目，尽早做出成果，尽早提转正流程，从而比过同龄人。",
+      "学校老师却在这时催你写论文：「开题报告什么时候交？」你会？"],
+    choices:[
+      {label:"先冲业务，论文往后放", fx:{s:-20,e:-15,a:15},
+        result:["你把导师的对话框设成了免打扰。","第一个月，你在组内周会上被点名表扬。导师那边，第三次催促也已读未回。"], next:"n10"},
+      {label:"白天实习，晚上写论文", fx:{e:-30,s:5,a:10},
+        result:["你每天凌晨两点关电脑，早上九点半打卡。","开题报告交上去了，导师批注：「论证粗糙，重写。」业务那边，mentor 说你最近状态不太好。"], next:"n10"},
+      {label:"跟 mentor 申请每周回学校一天", fx:{s:10,e:-10,a:20},
+        result:["mentor 说：「可以啊，你自己安排好就行。」","但你注意到，那些天天坐在工位上的实习生，被派到了更核心的项目上。"], next:"n10"}]},
+
+  n10:{prog:6, chapter:"第六章 · 薛定谔的名额", place:"深圳 · 工位", time:"研二 · 9月",
+    text:["你专心致志地 all in 互联网了。可还没等到转正流程发起，你们的项目组织就变动了 <strong>3 次</strong>。",
+      "第一次，项目合并。第二次，你的 +1 离职。第三次，整条业务线并入了另一个部门。",
+      "说好的转正名额，变得薛定谔起来。你每次问 mentor 还有没有转正机会，mentor 总是模棱两可：「HR 还没盘出来，再等等哈！」",
+      "但秋招已经开始了。身边的同学，已经在晒第一批 offer。"],
+    choices:[
+      {label:"离职，全力秋招", fx:{a:15,e:-5}, next:"n10a"},
+      {label:"继续实习，争取转正机会", fx:{a:10,e:-10}, next:"n11"},
+      {label:"都不要了，离开互联网", cls:"exit", exit:true, disabledIf:"exit2", disabledNote:"你已经不知道还能去哪了", next:"exit2"}]},
+
+  exit2:{prog:6, chapter:"退出尝试 · 离开", place:"深圳 · 出租屋", time:"研二 · 9月 · 01:40",
+    text:["你打开备忘录，认真算了一笔账：",
+      "陪跑 ¥12,800。北京、深圳两段房租。一年半的实习。三次搬家。一份写了 9 版的简历。还有那些整夜没睡的晚上。",
+      "如果现在离开，这些全部清零。",
+      "你又打开其他行业的招聘页面，发现自己的简历上只写着「需求文档」「增长实验」「用户画像」。离开互联网，这些词没人看得懂。",
+      "〔心〕你不是不想走。你是已经不知道，除了这条路，自己还会走什么路。"],
+    choices:[{label:"关掉备忘录", cls:"rewind", flag:"exit2", fx:{a:15}, next:"n10"}]},
+
+  n10a:{prog:6, chapter:"支线 · 裸辞秋招", place:"上海 · 宿舍", time:"研二 · 10月",
+    text:["你提了离职，回到上海。秋招提前批已经结束，正式批的 HC 一天比一天少。",
+      "每一场面试，面试官都会问同一个问题：「为什么暑期实习没有转正？」",
+      "你解释组织变动、解释名额冻结。对方礼貌地点点头，在系统里点了下一位。",
+      "你手上做过的那些项目，留在了深圳的服务器里。"],
+    choices:[{label:"继续投", fx:{a:20,e:-15}, next:"n13"}]},
+
+  n11:{prog:7, chapter:"第七章 · All in 转正", place:"深圳 · 工位", time:"研二 · 10月",
+    text:["你决定再赌一把。你主动接下没人愿意做的需求，周报写得比谁都长，半夜 12 点还在群里回消息。",
+      "〔心〕你知道这些周报里的数字没人细看。但不写，就会被看见没写。",
+      "导师的电话这次直接打了过来：",
+      "<strong>「论文预答辩就在下个月，你人在哪里？再不回来，你考虑一下延毕吧。」</strong>"],
+    choices:[
+      {label:"再跟导师求求情", fx:{e:-5,a:15},
+        result:["导师沉默了很久：「我理解你，但学校的规定，我改不了。」"], next:"n11b"},
+      {label:"答应导师，回学校", fx:{a:10}, next:"n11b"}]},
+
+  n11b:{prog:7, chapter:"保毕业", place:"深圳 · 小会议室", time:"研二 · 10月底",
+    text:["在多方无奈之下，你选择回学校完成毕业论文，先保住毕业。",
+      "你去找 mentor 提离职。mentor 说：「理解理解。不过走之前，你得先帮我把<strong>继任</strong>招进来。」",
+      "你要负责筛简历、面试继任。招进来以后，还要带他、跟他交接，你才能结束这段实习。"],
+    choices:[{label:"开始筛简历", cls:"primary", fx:{e:-10}, next:"n12"}]},
+
+  n12:{prog:8, chapter:"第八章 · 继任者", place:"深圳 · 小会议室", time:"研二 · 11月",
+    text:["你打开候选人的简历。一共三份，每一份都很眼熟。","你要选一个人，来接手你的一切。"],
+    choices:[
+      {label:"候选人 A", sub:"中文系研一。有一段社群运营实习，简历上的产品项目来自一个求职陪跑课。", fx:{a:5}, next:"n12r"},
+      {label:"候选人 B", sub:"新闻传播研一。同时在面 5 家公司，眼睛里有红血丝。", fx:{a:5}, next:"n12r"},
+      {label:"候选人 C", sub:"哲学研一。没有实习，面试时说：「我什么都愿意学。」", fx:{a:5}, next:"n12r"}]},
+
+  n12r:{prog:8, chapter:"面试官是你", place:"深圳 · 小会议室", time:"研二 · 11月",
+    text:["你问了他当初你被问过的那些问题：「项目数据是真实的吗？」「你一个文科生，为什么要做产品？」",
+      "坐在你对面的人，紧张地攥着衣角，<strong>像一年前的你</strong>。",
+      "你在面评里写下：建议录用。"],
+    choices:[{label:"开始交接", cls:"primary", next:"handover"}]},
+
+  handover:{prog:8, type:"handover", chapter:"交接清单", place:"深圳 · 工位", time:"实习最后一周",
+    text:["接下来一周，你要把手上的一切交给继任。<strong>点击每一项，完成交接。</strong>"],
+    items:[
+      ["新用户留存项目", "你熬了 40 个夜，留存提升 12%"],
+      ["37 份需求文档", "每一份都改过不下三版"],
+      ["数据看板和实验平台权限", "你一个个申请下来的"],
+      ["跨部门的合作关系", "你一杯杯咖啡请出来的"],
+      ["周报里的全部成果", "从下周起，署名是他"],
+      ["转正答辩 PPT 的第一页", "本来那里该写你的名字"]],
+    after:["交接完成。你的工牌在门禁处被收回。",
+      "这段实习里你做的所有工作，都会在继任的名字下继续生长。",
+      "<strong>你什么都没有带走。</strong>"]},
+
+  n13:{prog:9, chapter:"第九章 · 秋招", place:"上海 · 宿舍", time:"研二 · 11月–次年1月",
+    text:["你一边写论文，一边参加秋招。",
+      "投递 <strong>146</strong> 份。笔试 <strong>38</strong> 场。群面 <strong>9</strong> 场。单面 <strong>21</strong> 场。",
+      "有两家公司在终面后告诉你：HC 冻结了。",
+      "过五关，斩六将，在一片挣扎当中，你终于拿到了一份<strong>产品经理 offer</strong>。"],
+    choices:[{label:"接受 offer", cls:"primary", fx:{a:-25,e:-15,s:15}, next:"n14"}]},
+
+  n14:{prog:10, chapter:"第十章 · 新时代", place:"北京 · 入职第一周", time:"毕业后 · 7月",
+    text:["入职第一周，你发现一切都变了。",
+      "PRD 由 AI 一键生成，竞品分析交给 Agent 半小时跑完，原型图一句话就能画出来。你在陪跑课上学到的那些产品经理基本技能，<strong>很多都不能复用了</strong>。",
+      "新的岗位要求写着：「懂大模型能力边界，能独立设计 AI for Growth 方案，有 Prompt / Eval 经验者优先。」",
+      "你的同期里，有人本科学计算机，有人已经在自己搭 Agent。",
+      "〔心〕你知道，课是学不完的。你也知道，不学会更难受。"],
+    choices:[
+      {label:"马不停蹄地开始学 AI", cls:"primary", fx:{a:15}, next:"loop"},
+      {label:"先缓一缓，适应一下工作", fx:{a:25,m:-6999},
+        result:["半年后的绩效面谈，主管说：「你的 AI 能力，和同期比有些落后。」","当晚，你报了一门 ¥6,999 的 AI 产品经理课。"], next:"loop"},
+      {label:"躺平。工作做完就下班", cls:"exit", exit:true, disabledIf:"exit3", disabledNote:"躺不平", next:"exit3"}]},
+
+  exit3:{prog:10, chapter:"退出尝试 · 躺平", place:"北京 · 出租屋", time:"入职后 · 第一个周末",
+    text:["这个周末，你什么都没学。你睡到中午，看了两部电影，去楼下吃了碗面。",
+      "周一早上，你在群里看到同期发的周末学习笔记，被主管回复了一个大拇指。",
+      "你算了算：房租每月 ¥5,000，花呗还有一笔陪跑的分期没还完，家里还在等你「稳定下来」。",
+      "<strong>躺平需要底气</strong>，而你没有。",
+      "〔心〕你在群里回了一句「卷不动了哈哈」，然后打开了课程链接。"],
+    choices:[{label:"回到工位", cls:"rewind", flag:"exit3", fx:{a:20}, next:"n14"}]},
+
+  loop:{prog:10, type:"loop", chapter:"无尽模式", place:"北京 · 出租屋"},
+  ending:{prog:11, type:"ending"}
+};
+
+const LOOP = [
+  {peer:"同期小王在周会上演示了自己搭的 Agent，主管当场说：「大家都学学。」", learn:"Agent 工作流", cost:3999},
+  {peer:"新需求下来了：用大模型给新用户做个性化推荐。你连 RAG 是什么都要先查一下。", learn:"RAG 与向量检索", cost:2999},
+  {peer:"评审会上主管问：「你这个方案效果怎么评估？Eval 集在哪？」", learn:"模型评测 Eval", cost:2499},
+  {peer:"数据同学排期排到了下个月。你决定自己写 SQL 和 Python 跑数。", learn:"Python 数据分析", cost:1999},
+  {peer:"HR 通知：明年起，晋升答辩需要展示 AI 提效成果。", learn:"AI for Growth 实验设计", cost:4999},
+  {peer:"一个新模型发布了，群里所有人都在转发测评。你上个月学的东西，好像又过时了。", learn:"最新模型能力", cost:0},
+  {peer:"你刷到一个帖子：「不懂 AI 的产品经理，明年就会被优化。」", learn:"AI 产品经理认证", cost:5999},
+  {peer:"新来的应届生用 AI 一天写完的东西，你要做三天。", learn:"多模态与 AI 编程", cost:3499}
+];
+
+const LAB = {e:"精力", s:"学业", a:"焦虑", m:"存款"};
+let st;
+
+function reset(){
+  st = {node:"title", ...START, spent:0, flags:{}, log:[], mode:"scene", res:null, handed:[], loopN:0, exits:0, learned:[], entered:{}, enterFx:null, fx:false};
+  render(); window.scrollTo(0,0);
+}
+const clamp = v => Math.max(0, Math.min(100, v));
+const yuan = v => (v<0?"−":"") + "¥" + Math.abs(v).toLocaleString("en-US");
+
+function apply(fx){
+  const out=[]; if(!fx) return out;
+  for(const k of ["e","s","a","m"]){
+    if(!fx[k]) continue;
+    if(k==="m"){ st.m += fx.m; if(fx.m<0) st.spent += -fx.m; }
+    else st[k] = clamp(st[k]+fx[k]);
+    out.push([k,fx[k]]);
+  }
+  return out;
+}
+function chips(d){
+  if(!d || !d.length) return "";
+  return `<div class="chips">${d.map(([k,v])=>`<span class="chip ${k}">${LAB[k]} ${k==="m"? (v>0?"+":"")+yuan(v) : (v>0?"+":"−")+Math.abs(v)}</span>`).join("")}</div>`;
+}
+function go(id){
+  st.node=id; st.mode="scene"; st.res=null;
+  const n=N[id]; st.enterFx=null;
+  if(n.enter && !st.entered[id]){ st.enterFx=apply(n.enter); st.entered[id]=1; flashLater(st.enterFx); }
+  st.fx=true; render(); window.scrollTo({top:0,behavior:"smooth"});
+}
+let pendingFlash=null;
+function flashLater(d){ pendingFlash = (pendingFlash||[]).concat(d); }
+
+function choose(i){
+  const n=N[st.node], c=n.choices[i];
+  if(c.disabledIf && st.flags[c.disabledIf]) return;
+  st.log.push({ch:n.chapter, label:c.label});
+  if(c.flag) st.flags[c.flag]=1;
+  if(c.exit) st.exits++;
+  const d=apply(c.fx); flashLater(d);
+  if(c.result){ st.mode="result"; st.res={text:c.result, d, next:c.next}; st.fx=true; render(); window.scrollTo({top:0,behavior:"smooth"}); }
+  else go(c.next);
+}
+
+function btn(i,label,sub,cls,disabled){
+  return `<button class="choice ${cls||""}" data-k="${i+1}" data-act="c" data-i="${i}" ${disabled?"disabled":""}><kbd>${i+1}</kbd><span class="cl">${label}</span>${sub?`<span class="cs">${sub}</span>`:""}</button>`;
+}
+const paras = arr => `<div class="story ${st.fx?"fx":""}">${arr.map((p,i)=>{const inner=p.startsWith("〔心〕");return `<p${inner?' class="inner"':""} style="animation-delay:${i*110}ms">${inner?p.slice(3):p}</p>`;}).join("")}</div>`;
+const head = n => `<div class="loc"><span>${n.place}</span><span>${n.time}</span></div>`;
+
+function renderHUD(){
+  const h=document.getElementById("hud");
+  if(st.node==="title"){ h.hidden=true; return; }
+  h.hidden=false;
+  const n=N[st.node]||{};
+  const bar=(k)=>`<div class="stat ${k} ${(k==="e"&&st.e<=20)||(k==="a"&&st.a>=85)?"low":""}" data-s="${k}"><div class="lab">${LAB[k]}<b>${st[k]}</b></div><div class="bar"><i style="width:${st[k]}%"></i></div></div>`;
+  h.innerHTML = `<div class="hud-top"><span class="brand">大厂 Offer 模拟器</span><button class="restart" data-act="restart">重新开始</button></div>
+    <div class="stats">${bar("e")}${bar("s")}${bar("a")}<div class="stat m" data-s="m"><div class="lab">存款</div><div class="money ${st.m<0?"neg":""}">${yuan(st.m)}</div></div></div>
+    <div class="prog" aria-hidden="true"><i style="width:${Math.round((n.prog||0)/TOTAL*100)}%"></i></div>`;
+  if(pendingFlash){
+    for(const [k,v] of pendingFlash){
+      const el=h.querySelector(`[data-s="${k}"]`); if(!el) continue;
+      const s=document.createElement("span"); s.className="delta";
+      s.textContent = k==="m" ? (v>0?"+":"")+yuan(v) : (v>0?"+":"−")+Math.abs(v);
+      el.appendChild(s); setTimeout(()=>s.remove(),1900);
+    }
+    pendingFlash=null;
+  }
+}
+
+function render(){
+  renderHUD();
+  const sc=document.getElementById("scene");
+  const id=st.node, n=N[id];
+  if(id==="title"){
+    sc.innerHTML = `<div class="loc"><span>NEW GAME</span><span>难度：地狱（不可调）</span></div>
+    <div class="title-hero">
+      <h1>大厂<em>Offer</em><br>模拟器</h1>
+      <p class="sub">如果想进入一家互联网公司，拿到一个好职位，需要付出哪些努力、做出哪些抉择？而付出这些之后，结果又会是什么？</p>
+      <dl class="rolecard">
+        <dt>身份</dt><dd>文科研究生，在上海读书</dd>
+        <dt>目标</dt><dd>互联网大厂 · 产品经理</dd>
+        <dt>初始属性</dt><dd>精力 ${START.e} · 学业 ${START.s} · 焦虑 ${START.a} · 存款 ${yuan(START.m)}</dd>
+        <dt>规则</dt><dd>每一步都有选项，每个选择都会消耗点什么</dd>
+      </dl>
+      <div class="choices">${btn(0,"开始游戏","",'primary')}</div>
+      <p class="hint">可用键盘操作：按 <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> 选择，<kbd>Enter</kbd> 继续</p>
+    </div>`;
+    return;
+  }
+  if(st.mode==="result"){
+    sc.innerHTML = head(n) + `<div class="body"><p class="chapter">${n.chapter}</p>${paras(st.res.text)}${chips(st.res.d)}
+      <div class="choices">${btn(0,"继续","","primary")}</div></div>`;
+    st.fx=false; return;
+  }
+  if(n.type==="handover"){
+    const all = st.handed.length===n.items.length;
+    const list = n.items.map((it,i)=>{
+      const done=st.handed.includes(i);
+      return `<button class="hitem ${done?"done":""}" data-act="h" data-i="${i}" ${done?"disabled":""} ${!done?`data-k="${i+1}"`:""}>
+        <span class="txt">${it[0]}<small>${it[1]}</small></span><span class="tag">${done?"→ 继任":"交接"}</span></button>`;}).join("");
+    sc.innerHTML = head(n) + `<div class="body"><p class="chapter">${n.chapter}</p>${paras(n.text)}
+      <div class="handlist">${list}</div>
+      ${all? paras(n.after) + `<div class="choices">${btn(0,"离开工位","","primary")}</div>` : `<p class="counter">已交接 ${st.handed.length} / ${n.items.length}</p>`}</div>`;
+    st.fx=false; return;
+  }
+  if(n.type==="loop"){
+    const it=LOOP[st.loopN % LOOP.length];
+    const round=st.loopN+1;
+    const text=[it.peer];
+    if(st.e<=15) text.push("你已经很久没有睡过一个完整的觉了。");
+    if(st.m<0) text.push("你的存款早就花完了，这门课是用花呗分期付的。");
+    if(round>1) text.push("你学会的那些东西，并没有让焦虑少一点。");
+    if(round>2) text.push("〔心〕你在朋友圈转发了一句「人生是旷野，不是轨道」。然后继续听课。");
+    const learned = st.learned.length? `<div class="learned">${st.learned.map(x=>`<span>${x}</span>`).join("")}</div>` : "";
+    sc.innerHTML = `<div class="loc"><span>${n.place}</span><span>入职后 · 第 ${round} 个周末</span></div>
+      <div class="body"><p class="chapter">${round===1?"无尽模式":"又一个新要求"}</p>
+      <p class="counter">已学会 ${st.learned.length} 项 · 同龄人还在前面</p>
+      ${paras(text)}${learned}
+      <div class="choices">${btn(0,`学「${it.learn}」`, it.cost?`报课 ${yuan(-it.cost)}，这个周末没了`:"免费，但又是一个通宵","primary")}
+      ${round>=3? btn(1,"停下来","","quiet"):""}</div></div>`;
+    st.fx=false; return;
+  }
+  if(n.type==="ending"){ renderEnding(sc); return; }
+
+  const cs = n.choices.map((c,i)=>{
+    const dis = c.disabledIf && st.flags[c.disabledIf];
+    return btn(i, c.label, dis? c.disabledNote : c.sub, c.cls, dis);
+  }).join("");
+  sc.innerHTML = head(n) + `<div class="body"><p class="chapter">${n.chapter}</p>${paras(n.text)}${chips(st.enterFx)}<div class="choices">${cs}</div></div>`;
+  st.fx=false;
+}
+
+function renderEnding(sc){
+  const tl = st.log.filter(x=>!/^开始|继续$/.test(x.label)).map(x=>`<li><small>${x.ch}</small>${x.label}</li>`).join("");
+  sc.innerHTML = `<div class="loc"><span>GAME OVER?</span><span>没有通关画面</span></div>
+  <div class="body">
+    <p class="chapter">你每一步都知道，但每一步都没停</p>
+    ${paras(["回看这一路，其实你每一步都知道：社群运营没有意义，陪跑在贩卖焦虑，面试在比谁背得熟，周报没人细看，转正名额可能从来就不存在。",
+      st.exits? `你也试过退出，一共 ${st.exits} 次。可考编也在卷，沉没成本太高，躺平需要底气。每一扇门，都在你推开之前关上了。` : "你甚至没有试过退出。不是没看见那些门，而是你早就知道，门后面也是一样的。",
+      "于是你一边自嘲，一边继续。这个游戏<strong>没有通关画面，也没有退出按钮</strong>。",
+      "〔心〕刚才点下「停下来」的那一刻，你是真的想停，还是只是想喘口气？"])}
+    <h2 class="sec">你的结算</h2>
+    <div class="endgrid">
+      <div><b>${yuan(st.spent)}</b><span>总共花掉</span></div>
+      <div><b>3 段</b><span>实习经历</span></div>
+      <div><b>4 座</b><span>辗转城市：沪→京→深→沪→京</span></div>
+      <div class="zero"><b>0</b><span>实习成果带走了</span></div>
+      <div><b>${st.learned.length} 门</b><span>入职后又学的 AI 课</span></div>
+      <div class="zero"><b>${st.exits} 次</b><span>想过退出，成功 0 次</span></div>
+    </div>
+    <h2 class="sec">你做过的选择</h2>
+    <ol class="timeline">${tl}</ol>
+    <div class="discuss"><h3>一起想一想</h3><ol>
+      <li>你在哪一刻想过退出？是什么让你没有退出？</li>
+      <li>游戏里那些自嘲和玩笑，是在反抗，还是在帮自己继续下去？</li>
+      <li>如果所有人都知道这是一场「卷」，为什么没有人先停下来？</li></ol></div>
+    <div class="choices">${btn(0,"重新开始","","primary")}</div>
+  </div>`;
+}
+
+document.addEventListener("click", e=>{
+  const b=e.target.closest("[data-act]"); if(!b || b.disabled) return;
+  const act=b.dataset.act, i=+b.dataset.i;
+  if(act==="restart"){ reset(); return; }
+  if(act==="h"){ st.handed.push(i); flashLater(apply({a:3})); render(); return; }
+  // act === "c"
+  const id=st.node, n=N[id];
+  if(id==="title"){ go("n1"); return; }
+  if(st.mode==="result"){ go(st.res.next); return; }
+  if(n.type==="handover"){ go("n13"); return; }
+  if(n.type==="loop"){
+    if(i===0){
+      const it=LOOP[st.loopN % LOOP.length];
+      st.log.push({ch:`第 ${st.loopN+1} 个周末`, label:`学「${it.learn}」`});
+      flashLater(apply({e:-12,a:6,m:-it.cost}));
+      st.learned.push(it.learn); st.loopN++; st.fx=true; render();
+    } else { st.log.push({ch:"最后", label:"停下来"}); go("ending"); }
+    return;
+  }
+  if(n.type==="ending"){ reset(); return; }
+  choose(i);
+});
+document.addEventListener("keydown", e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  const sc=document.getElementById("scene");
+  let el=null;
+  if(/^[1-9]$/.test(e.key)) el=sc.querySelector(`[data-k="${e.key}"]:not(:disabled)`);
+  else if(e.key==="Enter" && !(document.activeElement && document.activeElement.tagName==="BUTTON")){
+    const all=sc.querySelectorAll("[data-k]:not(:disabled)"); if(all.length===1) el=all[0];
+  }
+  if(el){ e.preventDefault(); el.click(); }
+});
+reset();
+</script>
+
+</body></html>
